@@ -60,7 +60,7 @@ pub struct AuthorityPrivateInfo {
 fn socket_addr_from_hostport(host: &str, port: u16) -> SocketAddr {
     let mut addresses = format!("{host}:{port}")
         .to_socket_addrs()
-        .expect("Cannot parse {host} and {port} into socket address");
+        .unwrap_or_else(|e| panic!("Cannot parse {host} and {port} into socket address, error: {:?}", e));
     addresses
         .next()
         .expect("Hostname/IP resolution failed for {host}")
