@@ -562,6 +562,7 @@ impl SignedTransaction {
                 epoch,
                 authority,
                 signature,
+                timestamp: chrono::Utc::now().timestamp(),
             },
         }
     }
@@ -911,6 +912,7 @@ impl TransactionEffects {
                 epoch,
                 authority: *authority_name,
                 signature,
+                timestamp: chrono::Utc::now().timestamp(),
             },
         }
     }
@@ -1023,7 +1025,8 @@ pub struct SignatureAggregator<'a> {
     committee: &'a Committee,
     weight: usize,
     used_authorities: HashSet<AuthorityName>,
-    partial: CertifiedTransaction,
+    transaction: Transaction,
+    signatures: Vec<(AuthorityName, AuthoritySignature, i64)>,
 }
 
 impl<'a> SignatureAggregator<'a> {
@@ -1039,7 +1042,8 @@ impl<'a> SignatureAggregator<'a> {
             committee,
             weight: 0,
             used_authorities: HashSet::new(),
-            partial: CertifiedTransaction::new(transaction),
+            transaction,
+            signatures: vec![],
         }
     }
 
@@ -1051,7 +1055,7 @@ impl<'a> SignatureAggregator<'a> {
         authority: AuthorityName,
         signature: AuthoritySignature,
     ) -> Result<Option<CertifiedTransaction>, SuiError> {
-        signature.check(&self.partial.data, authority)?;
+        signature.check(&self.transaction.data, authority)?;
         // Check that each authority only appears once.
         fp_ensure!(
             !self.used_authorities.contains(&authority),
@@ -1063,13 +1067,15 @@ impl<'a> SignatureAggregator<'a> {
         fp_ensure!(voting_rights > 0, SuiError::UnknownSigner);
         self.weight += voting_rights;
         // Update certificate.
-        self.partial
-            .auth_sign_info
-            .signatures
-            .push((authority, signature));
+        self.signatures
+            .push((authority, signature, chrono::Utc::now().timestamp()));
 
         if self.weight >= self.committee.quorum_threshold() {
-            Ok(Some(self.partial.clone()))
+            Ok(Some(CertifiedTransaction::new(
+                0,
+                self.transaction.clone(),
+                self.signatures.clone(),
+            )))
         } else {
             Ok(None)
         }
@@ -1077,30 +1083,17 @@ impl<'a> SignatureAggregator<'a> {
 }
 
 impl CertifiedTransaction {
-    pub fn new(transaction: Transaction) -> CertifiedTransaction {
-        CertifiedTransaction {
-            transaction_digest: transaction.transaction_digest,
-            is_checked: false,
-            data: transaction.data,
-            tx_signature: transaction.tx_signature,
-            auth_sign_info: AuthorityQuorumSignInfo {
-                epoch: 0,
-                signatures: Vec::new(),
-            },
-        }
-    }
-
-    pub fn new_with_signatures(
+    pub fn new(
         epoch: EpochId,
         transaction: Transaction,
-        signatures: Vec<(AuthorityName, AuthoritySignature)>,
+        signatures: Vec<(AuthorityName, AuthoritySignature, i64)>,
     ) -> CertifiedTransaction {
         CertifiedTransaction {
             transaction_digest: transaction.transaction_digest,
             is_checked: false,
             data: transaction.data,
             tx_signature: transaction.tx_signature,
-            auth_sign_info: AuthorityQuorumSignInfo { epoch, signatures },
+            auth_sign_info: AuthorityQuorumSignInfo::new(epoch, signatures),
         }
     }
 
@@ -1140,7 +1133,7 @@ impl CertifiedTransaction {
 
         let mut weight = 0;
         let mut used_authorities = HashSet::new();
-        for (authority, _) in self.auth_sign_info.signatures.iter() {
+        for (authority, _) in self.auth_sign_info.signatures() {
             // Check that each authority only appears once.
             fp_ensure!(
                 !used_authorities.contains(authority),
@@ -1168,7 +1161,7 @@ impl CertifiedTransaction {
         let idx = obligation.messages.len();
         obligation.messages.push(message);
 
-        for tuple in self.auth_sign_info.signatures.iter() {
+        for tuple in self.auth_sign_info.signatures() {
             let (authority, signature) = tuple;
             // do we know, or can we build a valid public key?
             match committee.expanded_keys.get(authority) {
@@ -1198,7 +1191,7 @@ impl Display for CertifiedTransaction {
             writer,
             "Signed Authorities : {:?}",
             self.auth_sign_info
-                .signatures
+                .signatures()
                 .iter()
                 .map(|(name, _)| name)
                 .collect::<Vec<_>>()

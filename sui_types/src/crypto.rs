@@ -484,6 +484,7 @@ pub struct AuthoritySignInfo {
     pub epoch: EpochId,
     pub authority: AuthorityName,
     pub signature: AuthoritySignature,
+    pub timestamp: i64,
 }
 impl AuthoritySignInfoTrait for AuthoritySignInfo {}
 
@@ -506,7 +507,14 @@ impl PartialEq for AuthoritySignInfo {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct AuthorityQuorumSignInfo {
     pub epoch: EpochId,
-    pub signatures: Vec<(AuthorityName, AuthoritySignature)>,
+    signatures: Vec<(AuthorityName, AuthoritySignature)>,
+    /// The median value of all the timestamps from each authority signature.
+    /// This value is malleable, meaning that two `AuthorityQuorumSignInfo` could
+    /// be equally valid even when they have different median_sign_timestamp.
+    /// It all depends on which authority's signature is included. Because of this,
+    /// one should not trust the precision of this value. It should only be used
+    /// for cases where it can be useful to display a time on an user interface.
+    pub median_sign_timestamp: i64,
 }
 // Note: if you meet an error due to this line it may be because you need an Eq implementation for `CertifiedTransaction`,
 // or one of the structs that include it, i.e. `ConfirmationTransaction`, `TransactionInfoResponse` or `ObjectInfoResponse`.
@@ -521,6 +529,29 @@ pub struct AuthorityQuorumSignInfo {
 //
 static_assertions::assert_not_impl_any!(AuthorityQuorumSignInfo: Hash, Eq, PartialEq);
 impl AuthoritySignInfoTrait for AuthorityQuorumSignInfo {}
+
+impl AuthorityQuorumSignInfo {
+    pub fn new(epoch: EpochId, signatures: Vec<(AuthorityName, AuthoritySignature, i64)>) -> Self {
+        let mut timestamps: Vec<_> = signatures
+            .iter()
+            .map(|(_, _, timestamp)| timestamp)
+            .collect();
+        timestamps.sort_unstable();
+        let median_sign_timestamp = *timestamps[signatures.len() / 2];
+        Self {
+            epoch,
+            signatures: signatures
+                .into_iter()
+                .map(|(name, sig, _)| (name, sig))
+                .collect(),
+            median_sign_timestamp,
+        }
+    }
+
+    pub fn signatures(&self) -> &[(AuthorityName, AuthoritySignature)] {
+        &self.signatures
+    }
+}
 
 mod private {
     pub trait SealedAuthoritySignInfoTrait {}

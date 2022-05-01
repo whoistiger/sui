@@ -622,6 +622,7 @@
         "type": "object",
         "required": [
           "epoch",
+          "median_sign_timestamp",
           "signatures"
         ],
         "properties": {
@@ -629,6 +630,11 @@
             "type": "integer",
             "format": "uint64",
             "minimum": 0.0
+          },
+          "median_sign_timestamp": {
+            "description": "The median value of all the timestamps from each authority signature. This value is malleable, meaning that two `AuthorityQuorumSignInfo` could be equally valid even when they have different median_sign_timestamp. It all depends on which authority's signature is included. Because of this, one should not trust the precision of this value. It should only be used for cases where it can be useful to display a time on an user interface.",
+            "type": "integer",
+            "format": "int64"
           },
           "signatures": {
             "type": "array",

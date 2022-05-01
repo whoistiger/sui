@@ -60,16 +60,14 @@ fn create_gas_object(object_id: ObjectID, owner: SuiAddress) -> Object {
 
 /// This builds, signs a cert
 fn make_cert(keys: &[KeyPair], committee: &Committee, tx: &Transaction) -> CertifiedTransaction {
-    // Make certificate
-    let mut certificate = CertifiedTransaction::new(tx.clone());
-    certificate.auth_sign_info.epoch = committee.epoch();
+    let mut signatures = vec![];
     for i in 0..committee.quorum_threshold() {
         let secx = keys.get(i).unwrap();
         let pubx = secx.public_key_bytes();
-        let sig = AuthoritySignature::new(&certificate.data, secx);
-        certificate.auth_sign_info.signatures.push((*pubx, sig));
+        let sig = AuthoritySignature::new(&tx.data, secx);
+        signatures.push((*pubx, sig, chrono::Utc::now().timestamp()));
     }
-    certificate
+    CertifiedTransaction::new(committee.epoch(), tx.clone(), signatures)
 }
 
 fn make_transactions(

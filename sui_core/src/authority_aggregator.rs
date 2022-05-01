@@ -198,7 +198,7 @@ where
         let mut candidate_source_authorties: HashSet<AuthorityName> = cert
             .certificate
             .auth_sign_info
-            .signatures
+            .signatures()
             .iter()
             .map(|(name, _)| *name)
             .collect();
@@ -789,7 +789,7 @@ where
 
         struct ProcessTransactionState {
             // The list of signatures gathered at any point
-            signatures: Vec<(AuthorityName, AuthoritySignature)>,
+            signatures: Vec<(AuthorityName, AuthoritySignature, i64)>,
             // A certificate if we manage to make or find one
             certificate: Option<CertifiedTransaction>,
             // The list of errors gathered at any point
@@ -840,15 +840,15 @@ where
                                 state.signatures.push((
                                     name,
                                     inner_signed_transaction.auth_sign_info.signature,
+                                    inner_signed_transaction.auth_sign_info.timestamp,
                                 ));
                                 state.good_stake += weight;
                                 if state.good_stake >= threshold {
-                                    state.certificate =
-                                        Some(CertifiedTransaction::new_with_signatures(
-                                            self.committee.epoch(),
-                                            transaction_ref.clone(),
-                                            state.signatures.clone(),
-                                        ));
+                                    state.certificate = Some(CertifiedTransaction::new(
+                                        self.committee.epoch(),
+                                        transaction_ref.clone(),
+                                        state.signatures.clone(),
+                                    ));
                                 }
                             }
                             // If we get back an error, then we aggregate and check

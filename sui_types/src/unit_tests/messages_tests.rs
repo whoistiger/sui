@@ -126,13 +126,11 @@ fn test_certificates() {
         .append(v1.auth_sign_info.authority, v1.auth_sign_info.signature)
         .unwrap()
         .is_none());
-    let mut c = builder
+    let c = builder
         .append(v2.auth_sign_info.authority, v2.auth_sign_info.signature)
         .unwrap()
         .unwrap();
     assert!(c.check(&committee).is_ok());
-    c.auth_sign_info.signatures.pop();
-    assert!(c.check(&committee).is_err());
 
     let mut builder = SignatureAggregator::try_new(transaction, &committee).unwrap();
     assert!(builder

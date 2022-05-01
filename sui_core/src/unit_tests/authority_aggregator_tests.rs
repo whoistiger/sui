@@ -230,6 +230,7 @@ pub async fn extract_cert<A: AuthorityAPI>(
             votes.push((
                 signed.auth_sign_info.authority,
                 signed.auth_sign_info.signature,
+                signed.auth_sign_info.timestamp,
             ));
             if let Some(inner_transaction) = transaction {
                 assert!(inner_transaction.data == signed.data);
@@ -238,10 +239,13 @@ pub async fn extract_cert<A: AuthorityAPI>(
         }
     }
 
-    let stake: usize = votes.iter().map(|(name, _)| committee.weight(name)).sum();
+    let stake: usize = votes
+        .iter()
+        .map(|(name, _, _)| committee.weight(name))
+        .sum();
     assert!(stake >= committee.quorum_threshold());
 
-    CertifiedTransaction::new_with_signatures(
+    CertifiedTransaction::new(
         committee.epoch(),
         transaction.unwrap().to_transaction(),
         votes,
@@ -684,7 +688,7 @@ async fn test_process_transaction() {
 
     // The transaction still only has 3 votes, as only these are needed.
     let cert2 = extract_cert(&authority_clients, &authorities.committee, create2.digest()).await;
-    assert_eq!(3, cert2.auth_sign_info.signatures.len());
+    assert_eq!(3, cert2.auth_sign_info.signatures().len());
 }
 
 #[tokio::test]

@@ -18,7 +18,10 @@ use super::*;
 fn compare_certified_transactions(o1: &CertifiedTransaction, o2: &CertifiedTransaction) {
     assert_eq!(o1.digest(), o2.digest());
     // in this ser/de context it's relevant to compare signatures
-    assert_eq!(o1.auth_sign_info.signatures, o2.auth_sign_info.signatures);
+    assert_eq!(
+        o1.auth_sign_info.signatures(),
+        o2.auth_sign_info.signatures()
+    );
 }
 
 // Only relevant in a ser/de context : the `CertifiedTransaction` for a transaction is not unique
@@ -35,8 +38,8 @@ fn compare_object_info_responses(o1: &ObjectInfoResponse, o2: &ObjectInfoRespons
         (Some(cert1), Some(cert2)) => {
             assert_eq!(cert1.digest(), cert2.digest());
             assert_eq!(
-                cert1.auth_sign_info.signatures,
-                cert2.auth_sign_info.signatures
+                cert1.auth_sign_info.signatures(),
+                cert2.auth_sign_info.signatures()
             );
         }
         (None, None) => (),
@@ -182,16 +185,19 @@ fn test_cert() {
         ),
         &sender_key,
     );
-    let mut cert = CertifiedTransaction::new(transaction);
 
+    let mut signatures = vec![];
     for _ in 0..3 {
         let (_, authority_key) = get_key_pair();
-        let sig = AuthoritySignature::new(&cert.data, &authority_key);
+        let sig = AuthoritySignature::new(&transaction.data, &authority_key);
 
-        cert.auth_sign_info
-            .signatures
-            .push((*authority_key.public_key_bytes(), sig));
+        signatures.push((
+            *authority_key.public_key_bytes(),
+            sig,
+            chrono::Utc::now().timestamp(),
+        ));
     }
+    let cert = CertifiedTransaction::new(0, transaction, signatures);
 
     let buf = serialize_cert(&cert);
     let result = deserialize_message(buf.as_slice());
@@ -218,23 +224,7 @@ fn test_info_response() {
     );
 
     let (_, auth_key) = get_key_pair();
-    let vote = SignedTransaction::new(
-        0,
-        transaction.clone(),
-        *auth_key.public_key_bytes(),
-        &auth_key,
-    );
-
-    let mut cert = CertifiedTransaction::new(transaction);
-
-    for _ in 0..3 {
-        let (_, authority_key) = get_key_pair();
-        let sig = AuthoritySignature::new(&cert.data, &authority_key);
-
-        cert.auth_sign_info
-            .signatures
-            .push((*authority_key.public_key_bytes(), sig));
-    }
+    let vote = SignedTransaction::new(0, transaction, *auth_key.public_key_bytes(), &auth_key);
 
     let object = Object::with_id_owner_for_testing(dbg_object_id(0x20), dbg_addr(0x20));
     let resp1 = ObjectInfoResponse {
@@ -361,22 +351,25 @@ fn test_time_cert() {
         ),
         &sender_key,
     );
-    let mut cert = CertifiedTransaction::new(transaction);
 
     use std::collections::HashMap;
     let mut cache = HashMap::new();
+    let mut signatures = vec![];
     for _ in 0..7 {
         let (_, authority_key) = get_key_pair();
-        let sig = AuthoritySignature::new(&cert.data, &authority_key);
-        cert.auth_sign_info
-            .signatures
-            .push((*authority_key.public_key_bytes(), sig));
+        let sig = AuthoritySignature::new(&transaction.data, &authority_key);
+        signatures.push((
+            *authority_key.public_key_bytes(),
+            sig,
+            chrono::Utc::now().timestamp(),
+        ));
         cache.insert(
             *authority_key.public_key_bytes(),
             ed25519_dalek::PublicKey::from_bytes(authority_key.public_key_bytes().as_ref())
                 .expect("No problem parsing key."),
         );
     }
+    let cert = CertifiedTransaction::new(0, transaction, signatures);
 
     let mut buf = Vec::new();
     let now = Instant::now();
@@ -390,7 +383,7 @@ fn test_time_cert() {
     let mut buf2 = buf.as_slice();
     for _ in 0..count {
         if let SerializedMessage::Cert(cert) = deserialize_message(&mut buf2).unwrap() {
-            AuthoritySignature::verify_batch(&cert.data, &cert.auth_sign_info.signatures, &cache)
+            AuthoritySignature::verify_batch(&cert.data, cert.auth_sign_info.signatures(), &cache)
                 .unwrap();
         }
     }
