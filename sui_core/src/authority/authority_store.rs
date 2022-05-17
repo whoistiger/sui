@@ -991,6 +991,11 @@ impl<const ALL_OBJ_VER: bool, S: Eq + Serialize + for<'de> Deserialize<'de>>
             })
             .collect();
 
+        println!(
+            "batches_and_transactions >>>> {:#?} \n||||||||\n {:#?} <<<<<<",
+            batches, transactions
+        );
+
         Ok((batches, transactions))
     }
 

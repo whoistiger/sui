@@ -738,6 +738,19 @@ impl ByzantineAuthorityClient {
     }
 }
 
+#[test]
+fn test_empty_batch_signature() {
+    let (_, key_pair) = get_key_pair();
+    let secret = Arc::pin(key_pair.copy());
+    let name = key_pair.public_key_bytes();
+
+    let zero_batch = SignedBatch::new(AuthorityBatch::initial(), &*secret, *name);
+
+
+    zero_batch.signature.verify(&zero_batch.batch, zero_batch.authority).unwrap();
+
+}
+
 #[tokio::test]
 async fn test_safe_batch_stream() {
     // Create a random directory to store the DB

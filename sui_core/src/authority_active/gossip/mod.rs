@@ -134,6 +134,7 @@ where
     A: AuthorityAPI + Send + Sync + 'static + Clone,
 {
     pub fn new(peer_name: AuthorityName, active_authority: &ActiveAuthority<A>) -> PeerGossip<A> {
+        println!("Creating PeerGossip for {}", SuiAddress::from(&peer_name));
         PeerGossip {
             peer_name,
             client: active_authority.net.authority_clients[&peer_name].clone(),

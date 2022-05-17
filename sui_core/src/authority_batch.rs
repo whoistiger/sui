@@ -84,6 +84,7 @@ impl crate::authority::AuthorityState {
                 // Make a batch at zero
                 let zero_batch =
                     SignedBatch::new(AuthorityBatch::initial(), &*self.secret, self.name);
+                println!("inserting zero batch {:#?}", zero_batch);
                 self.db().batches.insert(&0, &zero_batch)?;
                 zero_batch.batch
             }
@@ -105,6 +106,7 @@ impl crate::authority::AuthorityState {
                 &*self.secret,
                 self.name,
             );
+            println!("inserting batch B");
             self.db().batches.insert(
                 &last_signed_batch.batch.next_sequence_number,
                 &last_signed_batch,
@@ -189,6 +191,7 @@ impl crate::authority::AuthorityState {
                     &*self.secret,
                     self.name,
                 );
+                println!("inserting batch A");
                 self.db()
                     .batches
                     .insert(&new_batch.batch.next_sequence_number, &new_batch)?;
@@ -268,6 +271,7 @@ impl crate::authority::AuthorityState {
                     }
                 }
 
+                println!("returning historical item {:?}", item);
                 Some((Ok(BatchInfoResponseItem(item)), local_state))
             } else {
                 // When there are no more historical items, maybe subscribe
@@ -294,6 +298,7 @@ impl crate::authority::AuthorityState {
                                     }
                                 };
 
+                                println!("returning item {:?}", item);
                                 let response = BatchInfoResponseItem(item);
 
                                 // Only stop at the batch boundary, once we have covered the last item.

@@ -306,6 +306,7 @@ impl Signature {
         // is this a cryptographically correct public key?
         // TODO: perform stricter key validation, sp. small order points, see https://github.com/MystenLabs/sui/issues/101
         let public_key = dalek::PublicKey::from_bytes(self.public_key_bytes()).map_err(|err| {
+            panic!();
             SuiError::InvalidSignature {
                 error: err.to_string(),
             }
@@ -314,6 +315,7 @@ impl Signature {
         // deserialize the signature
         let signature =
             ed25519_dalek::Signature::from_bytes(self.signature_bytes()).map_err(|err| {
+                panic!();
                 SuiError::InvalidSignature {
                     error: err.to_string(),
                 }
@@ -324,11 +326,12 @@ impl Signature {
         value.write(&mut message);
 
         // perform cryptographic signature check
-        public_key
-            .verify(&message, &signature)
-            .map_err(|error| SuiError::InvalidSignature {
+        public_key.verify(&message, &signature).map_err(|error| {
+            panic!();
+            SuiError::InvalidSignature {
                 error: error.to_string(),
-            })
+            }
+        })
     }
 
     pub fn get_verification_inputs<T>(
@@ -354,6 +357,7 @@ impl Signature {
         // deserialize the signature
         let signature =
             ed25519_dalek::Signature::from_bytes(self.signature_bytes()).map_err(|err| {
+                panic!();
                 SuiError::InvalidSignature {
                     error: err.to_string(),
                 }
@@ -417,11 +421,12 @@ impl AuthoritySignature {
         value.write(&mut message);
 
         // perform cryptographic signature check
-        public_key
-            .verify(&message, &signature)
-            .map_err(|error| SuiError::InvalidSignature {
+        public_key.verify(&message, &signature).map_err(|error| {
+            panic!();
+            SuiError::InvalidSignature {
                 error: error.to_string(),
-            })
+            }
+        })
     }
 
     /// This performs signature verification for a batch of signatures, equipped with a trusted cache of deserialized Public Keys that
@@ -461,6 +466,7 @@ impl AuthoritySignature {
             messages.push(&msg);
         }
         dalek::verify_batch(&messages[..], &signatures[..], &public_keys[..]).map_err(|error| {
+            panic!();
             SuiError::InvalidSignature {
                 error: format!("{error}"),
             }
@@ -620,8 +626,11 @@ impl VerificationObligation {
             &self.signatures[..],
             &self.public_keys[..],
         )
-        .map_err(|error| SuiError::InvalidSignature {
-            error: format!("{error}"),
+        .map_err(|error| {
+            panic!();
+            SuiError::InvalidSignature {
+                error: format!("{error}"),
+            }
         })?;
 
         Ok(self.lookup)

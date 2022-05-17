@@ -40,6 +40,7 @@ struct SuiNodeOpt {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    /*
     let config = telemetry_subscribers::TelemetryConfig {
         service_name: "sui_node".into(),
         enable_tracing: std::env::var("SUI_TRACING_ENABLE").is_ok(),
@@ -48,6 +49,7 @@ async fn main() -> anyhow::Result<()> {
     };
     #[allow(unused)]
     let guard = telemetry_subscribers::init(config);
+    */
 
     let options: SuiNodeOpt = SuiNodeOpt::parse();
     let config_path = options

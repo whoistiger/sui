@@ -184,9 +184,15 @@ impl<C> SafeClient<C> {
         )>,
     ) -> SuiResult {
         // check the signature of the batch
+        println!(
+            "Checking signature: (source {}) {:#?}",
+            SuiAddress::from(&signed_batch.authority),
+            signed_batch
+        );
         signed_batch
             .signature
             .verify(&signed_batch.batch, signed_batch.authority)?;
+        println!(">>>> sig ok");
 
         // ensure transactions enclosed match requested range
 
