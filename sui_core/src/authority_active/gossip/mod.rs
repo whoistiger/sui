@@ -4,7 +4,7 @@
 use futures::{stream::FuturesUnordered, StreamExt};
 use std::{collections::HashSet, sync::Arc, time::Duration};
 use sui_types::{
-    base_types::AuthorityName,
+    base_types::{AuthorityName, SuiAddress},
     batch::{TxSequenceNumber, UpdateItem},
     error::SuiError,
     messages::{

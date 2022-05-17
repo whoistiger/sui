@@ -52,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
     let options: SuiNodeOpt = SuiNodeOpt::parse();
     let config_path = options
         .config
-        .unwrap_or(sui_config_dir()?.join("node.conf"));
+        .unwrap_or(sui_config_dir()?.join("gateway.conf"));
     info!("Node config file path: {:?}", config_path);
 
     let server_builder = HttpServerBuilder::default();
@@ -75,7 +75,11 @@ async fn main() -> anyhow::Result<()> {
     let mut module = RpcModule::new(());
     let open_rpc = RpcGatewayOpenRpc::open_rpc();
     module.register_method("rpc.discover", move |_, _| Ok(open_rpc.clone()))?;
-    module.merge(SuiNode::new(&config_path)?.into_rpc())?;
+    let node = SuiNode::new(&config_path).await?;
+
+    let _join_handle = node.spawn().await;
+
+    module.merge(node.into_rpc())?;
 
     info!(
         "Available JSON-RPC methods : {:?}",
@@ -84,7 +88,7 @@ async fn main() -> anyhow::Result<()> {
 
     let addr = server.local_addr()?;
     let server_handle = server.start(module)?;
-    info!("Sui RPC Gateway listening on local_addr:{}", addr);
+    info!("Sui Node listening on local_addr:{}", addr);
 
     server_handle.await;
     Ok(())
