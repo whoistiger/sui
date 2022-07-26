@@ -33,6 +33,10 @@ members = [
     "crates/x",
 ]
 
+exclude = [
+    "simulation",
+]
+
 # Debug symbols are really important for profiling
 # [profile.release]
 # debug = true
@@ -45,3 +49,6 @@ debug = true
 
 [profile.bench]
 debug = true
+
+[patch.crates-io]
+tokio = { path = "/Users/mlogan/dev/madsim-fork/madsim-tokio" }
