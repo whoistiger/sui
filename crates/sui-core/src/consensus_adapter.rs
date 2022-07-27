@@ -12,6 +12,8 @@ use narwhal_types::TransactionProto;
 use narwhal_types::TransactionsClient;
 use parking_lot::Mutex;
 use std::collections::VecDeque;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::{
     collections::{hash_map::DefaultHasher, HashMap},
@@ -24,6 +26,7 @@ use sui_types::{
     error::{SuiError, SuiResult},
     messages::ConsensusTransaction,
 };
+use tokio::time::Instant;
 use tokio::{
     sync::{
         mpsc::{Receiver, Sender},
@@ -117,6 +120,11 @@ pub struct ConsensusAdapter {
     /// this delay passed, the client will be notified that its transaction was probably not
     /// sequence and it should try to resubmit its transaction.
     max_delay: Duration,
+
+    /// Estimation of the conensus delay, to use to dynamically adjust the delay
+    /// before we time out, so that we do not spam the consensus adapter with the
+    /// same transaction.
+    delay_ms: AtomicU64,
 }
 
 impl ConsensusAdapter {
@@ -136,6 +144,7 @@ impl ConsensusAdapter {
             committee,
             tx_consensus_listener,
             max_delay,
+            delay_ms: AtomicU64::new(max_delay.as_millis() as u64),
         }
     }
 
@@ -165,7 +174,9 @@ impl ConsensusAdapter {
             .expect("Failed to notify consensus listener");
 
         // Check if this authority submits the transaction to consensus.
-        if Self::should_submit(certificate) {
+        let now = Instant::now();
+        let should_submit = Self::should_submit(certificate);
+        if should_submit {
             self.consensus_client
                 .clone()
                 .submit_transaction(TransactionProto { transaction: bytes })
@@ -178,14 +189,34 @@ impl ConsensusAdapter {
         // certificate will be sequenced. So the best we can do is to set a timer and notify the
         // client to retry if we timeout without hearing back from consensus (this module does not
         // handle retries). The best timeout value depends on the consensus protocol.
-        match timeout(self.max_delay, waiter.wait_for_result()).await {
+        let back_off_delay =
+            self.max_delay + Duration::from_millis(self.delay_ms.load(Ordering::Relaxed));
+        let result = match timeout(back_off_delay, waiter.wait_for_result()).await {
             Ok(_) => Ok(()),
             Err(e) => {
                 // We drop the waiter which will signal to the conensus listener task to clean up
                 // the channels.
                 Err(SuiError::FailedToHearBackFromConsensus(e.to_string()))
             }
+        };
+
+        // Adapt the timeout for the next submission based on the delay we have observed so
+        // far using a weighted average. Note that if we keep timing out the delay will keep
+        // increasing linearly as we constantly add max_delay to the observe delay to set the
+        // time-out.
+        if should_submit {
+            let past_ms = now.elapsed().as_millis() as u64;
+            let current_delay = self.delay_ms.load(Ordering::Relaxed);
+            let new_delay = (500 * current_delay + 500 * past_ms) / 1000;
+            // clip to a max delay, 100x the self.max_delay. 100x is arbitrary
+            // but all we really need here is some max so that we do not wait for ever
+            // in case consensus if dead.
+            let new_delay = new_delay.min((self.max_delay.as_millis() as u64) * 100);
+
+            self.delay_ms.store(new_delay, Ordering::Relaxed);
         }
+
+        result
     }
 }
 
