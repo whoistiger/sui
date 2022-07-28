@@ -1188,6 +1188,7 @@ where
         &self,
         transaction: Transaction,
     ) -> Result<CertifiedTransaction, SuiError> {
+        /*
         // Find out which objects are required by this transaction and
         // ensure they are synced on authorities.
         let required_ids: Vec<ObjectID> = transaction
@@ -1199,6 +1200,7 @@ where
 
         let (_active_objects, _deleted_objects) =
             self.sync_all_given_objects(&required_ids).await?;
+        */
 
         // Now broadcast the transaction to all authorities.
         let threshold = self.committee.quorum_threshold();
