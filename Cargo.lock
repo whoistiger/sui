@@ -7075,6 +7075,7 @@ dependencies = [
  "sui-json",
  "sui-json-rpc",
  "sui-json-rpc-types",
+ "sui-test-data",
  "sui-types",
  "test-utils",
  "tokio",
@@ -7192,6 +7193,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "sui-test-data"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "hyper",
+ "move-package",
+ "serde 1.0.140",
+ "serde_json",
+ "sui",
+ "sui-config",
+ "sui-json",
+ "sui-json-rpc",
+ "sui-json-rpc-types",
+ "sui-types",
+ "test-utils",
+ "workspace-hack 0.1.0",
+]
+
+[[package]]
 name = "sui-test-validator"
 version = "0.0.0"
 dependencies = [
@@ -7211,6 +7231,7 @@ dependencies = [
  "sui-json",
  "sui-json-rpc",
  "sui-json-rpc-types",
+ "sui-test-data",
  "sui-types",
  "test-utils",
  "tokio",
