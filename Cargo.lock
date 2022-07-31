@@ -6907,6 +6907,7 @@ dependencies = [
  "move-vm-types",
  "num_enum",
  "once_cell",
+ "sha3 0.10.1",
  "smallvec",
  "sui-framework-build",
  "sui-types",
