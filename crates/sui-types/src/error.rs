@@ -370,6 +370,8 @@ pub enum SuiError {
     KeyConversionError(String),
     #[error("Invalid Private Key provided")]
     InvalidPrivateKey,
+    #[error("Invalid Public Key provided")]
+    InvalidPublicKey,
 
     // Epoch related errors.
     #[error("Validator temporarily stopped processing transactions due to epoch change")]

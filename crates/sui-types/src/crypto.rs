@@ -30,6 +30,7 @@ use signature::Signer;
 use crate::base_types::{AuthorityName, SuiAddress};
 use crate::committee::{Committee, EpochId};
 use crate::error::{SuiError, SuiResult};
+use crate::intent::{Intent, IntentMessage};
 use crate::sui_serde::{Base64, Readable, SuiBitmap};
 pub use enum_dispatch::enum_dispatch;
 
@@ -289,6 +290,20 @@ impl Signature {
         value.write(&mut message);
         secret.sign(&message)
     }
+
+    pub fn new_secure<T>(
+        value: &T,
+        intent: Intent,
+        secret: &dyn signature::Signer<Signature>,
+    ) -> Self
+    where
+        T: Serialize,
+    {
+        secret.sign(
+            &bcs::to_bytes(&IntentMessage::new(intent, value))
+                .expect("Message serialization should not fail"),
+        )
+    }
 }
 
 impl AsRef<[u8]> for Signature {
@@ -486,6 +501,10 @@ pub trait SuiSignature: Sized + signature::Signature {
     where
         T: Signable<Vec<u8>>;
 
+    fn verify_secure<T>(&self, value: &T, intent: Intent, author: SuiAddress) -> SuiResult<()>
+    where
+        T: Serialize;
+
     fn add_to_verification_obligation_or_verify(
         &self,
         author: SuiAddress,
@@ -504,8 +523,26 @@ impl<S: SuiSignatureInner + Sized> SuiSignature for S {
         let mut message = Vec::new();
         value.write(&mut message);
         pk.verify(&message[..], sig)
-            .map_err(|_| SuiError::InvalidSignature {
-                error: "hello".to_string(),
+            .map_err(|e| SuiError::InvalidSignature {
+                error: format!("{}", e),
+            })
+    }
+
+    fn verify_secure<T>(
+        &self,
+        value: &T,
+        intent: Intent,
+        author: SuiAddress,
+    ) -> Result<(), SuiError>
+    where
+        T: Serialize,
+    {
+        let message = bcs::to_bytes(&IntentMessage::new(intent, value))
+            .expect("Message serialization should not fail");
+        let (sig, pk) = &self.get_verification_inputs(author)?;
+        pk.verify(&message[..], sig)
+            .map_err(|e| SuiError::InvalidSignature {
+                error: format!("{}", e),
             })
     }
 
