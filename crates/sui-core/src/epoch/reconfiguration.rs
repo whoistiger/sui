@@ -16,7 +16,7 @@ use sui_types::crypto::AuthorityPublicKeyBytes;
 use sui_types::error::{SuiError, SuiResult};
 use sui_types::messages::SignedTransaction;
 use sui_types::sui_system_state::SuiSystemState;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 use typed_store::Map;
 
 #[async_trait]
@@ -191,28 +191,48 @@ where
         net_config.request_timeout = Some(Duration::from_secs(5));
         net_config.http2_keepalive_interval = Some(Duration::from_secs(5));
 
+        let cur_clients = self.net.load().authority_clients.clone();
+
         for validator in next_epoch_validators {
-            let address = Multiaddr::try_from(validator.net_address).map_err(|e| {
-                SuiError::GenericAuthorityError {
-                    error: e.to_string(),
+            let public_key_bytes = match AuthorityPublicKeyBytes::from_bytes(
+                &validator.pubkey_bytes,
+            ) {
+                Err(err) => {
+                    error!("Error parsing validator public key. Skip this validator in the committee: {:?}", err);
+                    continue;
                 }
-            })?; //TODO: handle what happens if a validator registers with a faulty address
+                Ok(result) => result,
+            };
+            if let Some(existing_client) = cur_clients.get(&public_key_bytes) {
+                // TODO: We currently do not allow a validator to modify its network settings.
+                new_clients.insert(public_key_bytes, existing_client.authority_client().clone());
+                debug!(
+                    "Adding unchanged client to the new network: {}",
+                    public_key_bytes
+                );
+                continue;
+            }
 
-            let channel =
-                net_config
-                    .connect_lazy(&address)
-                    .map_err(|e| SuiError::GenericAuthorityError {
-                        error: e.to_string(),
-                    })?;
+            let address = match Multiaddr::try_from(validator.net_address) {
+                Err(err) => {
+                    error!("Error parsing validator network address. Skip this validator in the committee: {:?}", err);
+                    continue;
+                }
+                Ok(result) => result,
+            };
+
+            let channel = match net_config.connect_lazy(&address) {
+                Err(err) => {
+                    error!("Error connecting to client {} with address {:?}. Skip this validator in the committee: {:?}", public_key_bytes, address, err);
+                    continue;
+                }
+                Ok(result) => result,
+            };
             let client: A = A::recreate(channel);
-
-            let pub_key_raw: &[u8] = &validator.pubkey_bytes;
-            let public_key_bytes =
-                AuthorityPublicKeyBytes::from_bytes(pub_key_raw).map_err(|e| {
-                    SuiError::GenericAuthorityError {
-                        error: e.to_string(),
-                    }
-                })?;
+            debug!(
+                "New network client created for {} at {:?}",
+                public_key_bytes, address
+            );
             new_clients.insert(public_key_bytes, client);
         }
 
